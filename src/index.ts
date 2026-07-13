@@ -1,10 +1,10 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 
-async function run() {
+async function run(): Promise<void> {
   try {
     const token = core.getInput('github-token', { required: true })
-    const daysInactive = parseInt(core.getInput('days-inactive'), 10)
+    const daysInactive = Number.parseInt(core.getInput('days-inactive'), 10)
     const labels = {
       stale: core.getInput('stale'),
       ignore: core.getInput('ignore')
@@ -15,12 +15,12 @@ async function run() {
 
     const octokit = github.getOctokit(token)
     const { owner, repo } = github.context.repo
-    const maintainers = ['OWNER', 'COLLABORATOR', 'MEMBER']
+    const maintainers = new Set(['OWNER', 'COLLABORATOR', 'MEMBER'])
 
     const threshold = new Date()
     threshold.setDate(threshold.getDate() - daysInactive)
 
-    async function fresh(issueNumber) {
+    async function fresh(issueNumber: number): Promise<void> {
       try {
         await octokit.rest.issues.removeLabel({
           owner,
@@ -29,8 +29,13 @@ async function run() {
           name: labels.stale,
         })
       }
-      catch (error) {
-        if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+      catch (error: unknown) {
+        if (
+          typeof error === 'object'
+          && error !== null
+          && 'status' in error
+          && error.status === 404
+        ) {
           return
         }
         throw error
@@ -48,16 +53,21 @@ async function run() {
 
     for (const issue of issues) {
       if (issue.pull_request) continue
-      const issueLabels = issue.labels
-        .flatMap(l => typeof l.name === 'string' ? [l.name.toLowerCase()] : [])
+
+      const issueLabels = issue.labels.flatMap((label): string[] => {
+        if (typeof label === 'string') return [label.toLowerCase()]
+        if (typeof label.name === 'string') return [label.name.toLowerCase()]
+        return []
+      })
+
       const labeled = {
         stale: issueLabels.includes(labels.stale.toLowerCase()),
-        ignore: issueLabels.some(l => labels.wip.includes(l)),
+        ignore: issueLabels.some(label => labels.ignore.includes(label)),
       }
 
       if (labeled.ignore) {
         if (labeled.stale) {
-          core.info(`Issue #${issue.number}: Removing stale label because it has a wip label`)
+          core.info(`Issue #${issue.number}: Removing stale label because it has an ignored label`)
           await fresh(issue.number)
         }
         continue
@@ -91,7 +101,7 @@ async function run() {
 
       const lastComment = comments[0]
       const role = lastComment?.author_association
-      const shouldBeStale = role ? maintainers.includes(role) : false
+      const shouldBeStale = typeof role === 'string' && maintainers.has(role)
 
       if (shouldBeStale && !labeled.stale) {
         core.info(`Issue #${issue.number}: Last active user role was ${role}`)
@@ -109,7 +119,7 @@ async function run() {
       }
     }
   }
-  catch (error) {
+  catch (error: unknown) {
     if (error instanceof Error) {
       core.setFailed(error.message)
     }
@@ -119,4 +129,4 @@ async function run() {
   }
 }
 
-run()
+void run()

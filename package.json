@@ -1,12 +1,14 @@
 {
   "name": "stalebot",
   "version": "1.0.2",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "ncc build index.js -o dist",
-    "pretest": "npm start",
-    "test": "dprint fmt index.js",
-    "preversion": "npm start",
+    "build": "ncc build src/index.ts -o dist",
+    "start": "npm run build",
+    "pretest": "npm run build && npm run typecheck",
+    "test": "dprint fmt src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "preversion": "npm run build && npm run typecheck",
     "version": "git add dist",
     "postversion": "node scripts/sync-major-tag.js"
   },
@@ -16,6 +18,7 @@
   },
   "devDependencies": {
     "@vercel/ncc": "^0.44.1",
-    "dprint": "^0.55.1"
+    "dprint": "^0.55.1",
+    "typescript": "^5.9.2"
   }
 }
