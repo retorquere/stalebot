@@ -1,0 +1,24 @@
+name: 'Label Unanswered Maintainer Issues'
+description: 'Labels issues if they have sat stagnant and the last comment was by a maintainer.'
+author: 'Your Name'
+
+inputs:
+  github-token:
+    description: 'The GitHub token (usually secrets.GITHUB_TOKEN)'
+    required: true
+  days-inactive:
+    description: 'Number of days an issue must be inactive before labeling'
+    required: false
+    default: '14'
+  wip:
+    description: Comma-separated work-in-progress labels that are exempt from stale
+    required: false
+    default: 'wip'
+  stale:
+    description: 'The label to apply to the issue'
+    required: false
+    default: 'stale'
+
+runs:
+  using: 'node24'
+  main: 'index.js'

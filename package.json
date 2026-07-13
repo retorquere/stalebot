@@ -1,0 +1,16 @@
+{
+  "name": "stalebot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "dprint fmt index.js",
+    "postversion": "node scripts/sync-major-tag.js"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1"
+  },
+  "devDependencies": {
+    "dprint": "^0.55.1"
+  }
+}
