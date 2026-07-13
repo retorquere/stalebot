@@ -5,16 +5,17 @@
   "scripts": {
     "build": "ncc build src/index.ts -o dist",
     "start": "npm run build",
-    "pretest": "npm run build && npm run typecheck",
+    "pretest": "npm run build && npm run typecheck && npm run bundlecheck",
     "test": "dprint fmt src/index.ts",
     "typecheck": "tsc --noEmit",
-    "preversion": "npm run build && npm run typecheck",
+    "bundlecheck": "node scripts/check-bundle.js",
+    "preversion": "npm run build && npm run typecheck && npm run bundlecheck",
     "version": "git add dist",
     "postversion": "node scripts/sync-major-tag.js"
   },
   "dependencies": {
-    "@actions/core": "^3.0.1",
-    "@actions/github": "^9.1.1"
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0"
   },
   "devDependencies": {
     "@vercel/ncc": "^0.44.1",

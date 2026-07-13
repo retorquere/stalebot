@@ -53,6 +53,7 @@ jobs:
 
 - This action currently inspects up to 100 most recently updated open issues per run.
 - Make sure the token has permission to read and write issues.
+- The test pipeline now fails if `dist/index.js` contains unresolved module markers (for example `webpackMissingModule`).
 
 ## Releasing
 
