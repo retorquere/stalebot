@@ -58,6 +58,7 @@ jobs:
 
 This repository has a `postversion` hook. Running `npm version <type>` will:
 
+- bundle the action with ncc into `dist/index.js` and stage `dist`
 - bump `package.json` version and create the version tag (for example `v1.5.0`)
 - move the major action tag (for example `v1`) to the same commit
 - push release tags (`git push origin --follow-tags`)
