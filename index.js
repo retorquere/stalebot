@@ -7,7 +7,7 @@ async function run() {
     const daysInactive = parseInt(core.getInput('days-inactive'), 10)
     const labels = {
       stale: core.getInput('stale'),
-      wip: core.getInput('wip')
+      ignore: core.getInput('ignore')
         .split(',')
         .map(label => label.trim().toLowerCase())
         .filter(Boolean),
@@ -50,11 +50,13 @@ async function run() {
       if (issue.pull_request) continue
       const issueLabels = issue.labels
         .flatMap(l => typeof l.name === 'string' ? [l.name.toLowerCase()] : [])
-      const hasStaleLabel = issueLabels.includes(labels.stale.toLowerCase())
-      const hasWipLabel = issueLabels.some(l => labels.wip.includes(l))
+      const labeled = {
+        stale: issueLabels.includes(labels.stale.toLowerCase()),
+        ignore: issueLabels.some(l => labels.wip.includes(l)),
+      }
 
-      if (hasWipLabel) {
-        if (hasStaleLabel) {
+      if (labeled.ignore) {
+        if (labeled.stale) {
           core.info(`Issue #${issue.number}: Removing stale label because it has a wip label`)
           await fresh(issue.number)
         }
@@ -63,7 +65,7 @@ async function run() {
 
       const updated = new Date(issue.updated_at)
       if (updated > threshold) {
-        if (hasStaleLabel) {
+        if (labeled.stale) {
           core.info(`Issue #${issue.number}: Removing stale label because issue is active`)
           await fresh(issue.number)
         }
@@ -71,7 +73,7 @@ async function run() {
       }
 
       if (issue.comments === 0) {
-        if (hasStaleLabel) {
+        if (labeled.stale) {
           core.info(`Issue #${issue.number}: Removing stale label because issue has no comments`)
           await fresh(issue.number)
         }
@@ -91,7 +93,7 @@ async function run() {
       const role = lastComment?.author_association
       const shouldBeStale = role ? maintainers.includes(role) : false
 
-      if (shouldBeStale && !hasStaleLabel) {
+      if (shouldBeStale && !labeled.stale) {
         core.info(`Issue #${issue.number}: Last active user role was ${role}`)
 
         await octokit.rest.issues.addLabels({
@@ -101,7 +103,7 @@ async function run() {
           labels: [labels.stale],
         })
       }
-      else if (!shouldBeStale && hasStaleLabel) {
+      else if (!shouldBeStale && labeled.stale) {
         core.info(`Issue #${issue.number}: Removing stale label because last comment was not from a maintainer`)
         await fresh(issue.number)
       }

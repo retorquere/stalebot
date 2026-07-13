@@ -11,7 +11,7 @@ Issues are skipped when:
 
 - they are pull requests
 - they already have the stale label
-- they contain any label listed in `wip`
+- they contain any label listed in `ignore`
 
 ## Inputs
 
@@ -19,7 +19,7 @@ Issues are skipped when:
 |-----------------|----------|---------|------------------------------------------------------------------------------------------------------------|
 | `github-token`  | Yes      | -       | GitHub token used to read and label issues.                                                                |
 | `days-inactive` | No       | `14`    | Number of inactive days before an issue is considered stale.                                               |
-| `wip`           | No       | `wip`   | Comma-separated labels that exempt an issue from stale labeling (for example: `wip,blocked,needs-design`). |
+| `ignore`        | No       | ``      | Comma-separated labels that exempt an issue from stale labeling (for example: `wip,blocked,needs-design`). |
 | `stale`         | No       | `stale` | Label to apply to qualifying issues.                                                                       |
 
 ## Example workflow
@@ -46,7 +46,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           days-inactive: '14'
           stale: 'stale'
-          wip: 'wip,blocked,in-progress'
+          ignore: 'wip,blocked,in-progress'
 ```
 
 ## Notes

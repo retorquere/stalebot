@@ -10,10 +10,10 @@ inputs:
     description: 'Number of days an issue must be inactive before labeling'
     required: false
     default: '14'
-  wip:
+  ignore:
     description: Comma-separated work-in-progress labels that are exempt from stale
     required: false
-    default: 'wip'
+    default: ''
   stale:
     description: 'The label to apply to the issue'
     required: false
