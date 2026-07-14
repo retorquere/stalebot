@@ -2,10 +2,14 @@
 
 GitHub Action that labels open issues as stale when:
 
-- the issue has been inactive for a configurable number of days
+- the most recent non-maintainer activity is older than a configurable number of days
+- there is at least one maintainer comment on the issue
 - the last comment was from a maintainer (`OWNER`, `COLLABORATOR`, or `MEMBER`)
 
 It also removes the stale label when an issue no longer qualifies (for example, after new activity or when the latest comment is not from a maintainer).
+It also removes the stale label when an issue is closed.
+
+Stale marking and regular stale cleanup are done by scanning open issues (up to 100 recently updated issues). Event-driven stale cleanup is done on issue close and on new non-maintainer comments in open issues.
 
 Issues are skipped when:
 
@@ -28,6 +32,8 @@ Issues are skipped when:
 name: Label Unanswered Maintainer Issues
 
 on:
+  issues:
+    types: [closed]
   issue_comment:
     types: [created]
   schedule:

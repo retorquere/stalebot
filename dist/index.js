@@ -29979,6 +29979,54 @@ async function run() {
         const maintainers = new Set(['OWNER', 'COLLABORATOR', 'MEMBER']);
         const threshold = new Date();
         threshold.setDate(threshold.getDate() - daysInactive);
+        async function getIssueCommentContext(issueNumber) {
+            let page = 1;
+            let lastCommentRole;
+            let hasMaintainerComment = false;
+            while (true) {
+                const { data: comments } = await octokit.rest.issues.listComments({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    per_page: 100,
+                    page,
+                    sort: 'created',
+                    direction: 'desc',
+                });
+                if (comments.length === 0)
+                    break;
+                if (!lastCommentRole) {
+                    const role = comments[0]?.author_association;
+                    if (typeof role === 'string') {
+                        lastCommentRole = role;
+                    }
+                }
+                if (!hasMaintainerComment) {
+                    hasMaintainerComment = comments.some((comment) => {
+                        const role = comment.author_association;
+                        return typeof role === 'string' && maintainers.has(role);
+                    });
+                }
+                const lastNonMaintainerComment = comments.find((comment) => {
+                    const role = comment.author_association;
+                    return typeof role === 'string' && !maintainers.has(role);
+                });
+                if (lastNonMaintainerComment) {
+                    return {
+                        lastCommentRole,
+                        lastNonMaintainerCommentAt: new Date(lastNonMaintainerComment.created_at),
+                        hasMaintainerComment,
+                    };
+                }
+                if (comments.length < 100)
+                    break;
+                page += 1;
+            }
+            return {
+                lastCommentRole,
+                hasMaintainerComment,
+            };
+        }
         async function fresh(issueNumber) {
             try {
                 await octokit.rest.issues.removeLabel({
@@ -29998,6 +30046,29 @@ async function run() {
                 throw error;
             }
         }
+        const payloadIssue = github.context.payload.issue;
+        if (payloadIssue) {
+            if (payloadIssue.state === 'closed') {
+                core.info(`Issue #${payloadIssue.number}: Closed event detected, removing stale label if present`);
+                await fresh(payloadIssue.number);
+            }
+            else if (github.context.eventName === 'issue_comment' && payloadIssue.state === 'open') {
+                const role = github.context.payload.comment?.author_association;
+                const isMaintainerComment = typeof role === 'string' && maintainers.has(role);
+                if (!isMaintainerComment) {
+                    core.info(`Issue #${payloadIssue.number}: New non-maintainer comment, removing stale label if present`);
+                    await fresh(payloadIssue.number);
+                }
+                else {
+                    core.info(`Issue #${payloadIssue.number}: Maintainer comment, no event-driven unstale action`);
+                }
+            }
+            else {
+                core.info(`Issue #${payloadIssue.number}: No event-driven unstale action for this event`);
+            }
+            return;
+        }
+        core.info('No issue in event payload; scanning open repository issues');
         const { data: issues } = await octokit.rest.issues.listForRepo({
             owner,
             repo,
@@ -30009,7 +30080,7 @@ async function run() {
         for (const issue of issues) {
             if (issue.pull_request)
                 continue;
-            const issueLabels = issue.labels.flatMap((label) => {
+            const issueLabels = (issue.labels ?? []).flatMap((label) => {
                 if (typeof label === 'string')
                     return [label.toLowerCase()];
                 if (typeof label.name === 'string')
@@ -30027,34 +30098,26 @@ async function run() {
                 }
                 continue;
             }
-            const updated = new Date(issue.updated_at);
-            if (updated > threshold) {
-                if (labeled.stale) {
-                    core.info(`Issue #${issue.number}: Removing stale label because issue is active`);
-                    await fresh(issue.number);
-                }
-                continue;
+            let lastNonMaintainerActivityAt;
+            const issueAuthorRole = issue.author_association;
+            if (typeof issueAuthorRole === 'string' && !maintainers.has(issueAuthorRole)) {
+                lastNonMaintainerActivityAt = new Date(issue.created_at);
             }
-            if (issue.comments === 0) {
-                if (labeled.stale) {
-                    core.info(`Issue #${issue.number}: Removing stale label because issue has no comments`);
-                    await fresh(issue.number);
+            let lastCommentRole;
+            let hasMaintainerComment = false;
+            if (issue.comments > 0) {
+                const commentContext = await getIssueCommentContext(issue.number);
+                lastCommentRole = commentContext.lastCommentRole;
+                hasMaintainerComment = commentContext.hasMaintainerComment;
+                if (commentContext.lastNonMaintainerCommentAt) {
+                    lastNonMaintainerActivityAt = commentContext.lastNonMaintainerCommentAt;
                 }
-                continue;
             }
-            const { data: comments } = await octokit.rest.issues.listComments({
-                owner,
-                repo,
-                issue_number: issue.number,
-                per_page: 1,
-                sort: 'created',
-                direction: 'desc',
-            });
-            const lastComment = comments[0];
-            const role = lastComment?.author_association;
-            const shouldBeStale = typeof role === 'string' && maintainers.has(role);
+            const lastCommentIsMaintainer = typeof lastCommentRole === 'string' && maintainers.has(lastCommentRole);
+            const nonMaintainerIsInactive = !!lastNonMaintainerActivityAt && lastNonMaintainerActivityAt <= threshold;
+            const shouldBeStale = hasMaintainerComment && lastCommentIsMaintainer && nonMaintainerIsInactive;
             if (shouldBeStale && !labeled.stale) {
-                core.info(`Issue #${issue.number}: Last active user role was ${role}`);
+                core.info(`Issue #${issue.number}: Last comment was from maintainer and non-maintainer activity is older than ${daysInactive} days`);
                 await octokit.rest.issues.addLabels({
                     owner,
                     repo,
@@ -30063,7 +30126,7 @@ async function run() {
                 });
             }
             else if (!shouldBeStale && labeled.stale) {
-                core.info(`Issue #${issue.number}: Removing stale label because last comment was not from a maintainer`);
+                core.info(`Issue #${issue.number}: Removing stale label because stale criteria are no longer met`);
                 await fresh(issue.number);
             }
         }
